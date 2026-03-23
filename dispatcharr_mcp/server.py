@@ -1,0 +1,514 @@
+"""Dispatcharr MCP server — exposes Dispatcharr IPTV management to AI agents.
+
+Tools are grouped by domain:
+  • Channels       — list, get, create, update, delete channels & groups
+  • Streams        — list/get raw M3U streams by source
+  • Proxy          — live stream status and control (change, stop, failover)
+  • EPG            — EPG sources and programme data
+  • M3U Accounts   — manage M3U provider accounts
+  • VOD            — movies, series, episodes
+  • System         — settings, stream profiles, system events
+"""
+
+from mcp.server.fastmcp import FastMCP
+
+from dispatcharr_mcp.client import DispatcharrClient
+
+mcp = FastMCP("Dispatcharr")
+
+
+def _client() -> DispatcharrClient:
+    """Instantiate per-call so the MCP server process doesn't hold a login
+    session open indefinitely — the client re-uses its JWT until it expires."""
+    return DispatcharrClient()
+
+
+def _clean(params: dict) -> dict:
+    """Omit unset parameters so the API applies its own defaults rather than
+    receiving explicit nulls that could override or invalidate fields."""
+    return {k: v for k, v in params.items() if v is not None}
+
+
+# ---------------------------------------------------------------------------
+# CHANNELS
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def list_channels(
+    search: str | None = None,
+    channel_group: str | None = None,
+    page: int | None = None,
+    page_size: int | None = None,
+) -> dict:
+    """List channels with optional filtering.
+
+    Returns a paginated list of channels. Use `search` to filter by name,
+    `channel_group` to filter by group name, and `page`/`page_size` for pagination.
+    """
+    return await _client().get(
+        "/api/channels/channels/",
+        params=_clean(
+            {
+                "search": search,
+                "channel_group": channel_group,
+                "page": page,
+                "page_size": page_size,
+            }
+        ),
+    )
+
+
+@mcp.tool()
+async def get_channel(channel_id: int) -> dict:
+    """Get a single channel by its integer ID."""
+    return await _client().get(f"/api/channels/channels/{channel_id}/")
+
+
+@mcp.tool()
+async def create_channel(
+    name: str,
+    channel_number: float | None = None,
+    channel_group_id: int | None = None,
+) -> dict:
+    """Create a new channel.
+
+    Provide at minimum a `name`. Optionally assign a channel number and group.
+    """
+    data: dict = {"name": name}
+    if channel_number is not None:
+        data["channel_number"] = channel_number
+    if channel_group_id is not None:
+        data["channel_group"] = channel_group_id
+    return await _client().post("/api/channels/channels/", data=data)
+
+
+@mcp.tool()
+async def update_channel(channel_id: int, fields: dict) -> dict:
+    """Partially update a channel.
+
+    Pass any subset of channel fields as `fields` (e.g. {"name": "BBC One",
+    "channel_number": 1.0}).  Only provided fields are changed.
+    """
+    return await _client().patch(f"/api/channels/channels/{channel_id}/", data=fields)
+
+
+@mcp.tool()
+async def delete_channel(channel_id: int) -> dict:
+    """Delete a channel by ID."""
+    return await _client().delete(f"/api/channels/channels/{channel_id}/")
+
+
+@mcp.tool()
+async def get_channel_streams(channel_id: int) -> dict:
+    """Get all streams (M3U sources) assigned to a specific channel."""
+    return await _client().get(f"/api/channels/channels/{channel_id}/streams/")
+
+
+# ---------------------------------------------------------------------------
+# CHANNEL GROUPS
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def list_channel_groups() -> list:
+    """List all channel groups."""
+    return await _client().get("/api/channels/groups/")
+
+
+@mcp.tool()
+async def create_channel_group(name: str) -> dict:
+    """Create a new channel group."""
+    return await _client().post("/api/channels/groups/", data={"name": name})
+
+
+@mcp.tool()
+async def delete_channel_group(group_id: int) -> dict:
+    """Delete a channel group by ID."""
+    return await _client().delete(f"/api/channels/groups/{group_id}/")
+
+
+# ---------------------------------------------------------------------------
+# STREAMS (raw M3U streams from provider accounts)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def list_streams(
+    search: str | None = None,
+    m3u_account: int | None = None,
+    channel_group_name: str | None = None,
+    page: int | None = None,
+    page_size: int | None = None,
+) -> dict:
+    """List raw M3U streams from provider accounts.
+
+    These are the source streams imported from M3U playlists, not the
+    channel output. Filter by `m3u_account` (account ID), group name,
+    or free-text `search`.
+    """
+    return await _client().get(
+        "/api/channels/streams/",
+        params=_clean(
+            {
+                "search": search,
+                "m3u_account": m3u_account,
+                "channel_group_name": channel_group_name,
+                "page": page,
+                "page_size": page_size,
+            }
+        ),
+    )
+
+
+@mcp.tool()
+async def get_stream(stream_id: int) -> dict:
+    """Get a single M3U stream by its integer ID."""
+    return await _client().get(f"/api/channels/streams/{stream_id}/")
+
+
+@mcp.tool()
+async def create_channel_from_stream(
+    stream_id: int,
+    name: str | None = None,
+    channel_number: float | None = None,
+    channel_profile_ids: list[int] | None = None,
+) -> dict:
+    """Create a channel directly from an existing stream.
+
+    This is the quick way to add a channel: provide the `stream_id` and
+    Dispatcharr will create a matching channel and link the stream.
+    Optionally supply a custom `name`, `channel_number`, and which
+    `channel_profile_ids` the new channel should belong to (omit for all profiles).
+    """
+    data: dict = {"stream_id": stream_id}
+    if name is not None:
+        data["name"] = name
+    if channel_number is not None:
+        data["channel_number"] = channel_number
+    if channel_profile_ids is not None:
+        data["channel_profile_ids"] = channel_profile_ids
+    return await _client().post("/api/channels/channels/from-stream/", data=data)
+
+
+# ---------------------------------------------------------------------------
+# PROXY — live stream status and control
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def get_proxy_status() -> dict:
+    """Get live status of all currently active proxy streams.
+
+    Returns client counts, current stream URLs, buffer stats, and more for
+    every channel that is actively streaming right now.
+    """
+    return await _client().get("/proxy/ts/status")
+
+
+@mcp.tool()
+async def get_channel_proxy_status(channel_id: str) -> dict:
+    """Get the live proxy status for a specific channel.
+
+    `channel_id` is the channel's string identifier used by the proxy
+    (typically the channel number or UUID).
+    """
+    return await _client().get(f"/proxy/ts/status/{channel_id}")
+
+
+@mcp.tool()
+async def change_channel_stream(channel_id: str) -> dict:
+    """Force a channel to switch to its next available stream source.
+
+    Use this when a stream is buffering badly or has failed—Dispatcharr
+    will immediately try the next source in the failover list.
+    """
+    return await _client().post(f"/proxy/ts/change_stream/{channel_id}")
+
+
+@mcp.tool()
+async def next_channel_stream(channel_id: str) -> dict:
+    """Advance a channel to the next stream in its rotation.
+
+    Similar to `change_channel_stream` but explicitly moves forward one
+    position in the stream list rather than picking the best available.
+    """
+    return await _client().post(f"/proxy/ts/next_stream/{channel_id}")
+
+
+@mcp.tool()
+async def stop_channel_stream(channel_id: str) -> dict:
+    """Stop all active streams for a channel, disconnecting all clients."""
+    return await _client().post(f"/proxy/ts/stop/{channel_id}")
+
+
+@mcp.tool()
+async def stop_channel_client(channel_id: str) -> dict:
+    """Stop a specific client connection on a channel without stopping others."""
+    return await _client().post(f"/proxy/ts/stop_client/{channel_id}")
+
+
+# ---------------------------------------------------------------------------
+# EPG
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def list_epg_sources() -> list:
+    """List all configured EPG (Electronic Programme Guide) sources."""
+    return await _client().get("/api/epg/sources/")
+
+
+@mcp.tool()
+async def get_epg_source(source_id: int) -> dict:
+    """Get a single EPG source by ID."""
+    return await _client().get(f"/api/epg/sources/{source_id}/")
+
+
+@mcp.tool()
+async def list_epg_data(page: int | None = None, page_size: int | None = None) -> dict:
+    """List EPG data entries (programme metadata from EPG sources)."""
+    return await _client().get(
+        "/api/epg/epgdata/",
+        params=_clean({"page": page, "page_size": page_size}),
+    )
+
+
+@mcp.tool()
+async def list_epg_programs(
+    page: int | None = None, page_size: int | None = None
+) -> dict:
+    """List EPG program schedule entries (start/stop times, titles, descriptions)."""
+    return await _client().get(
+        "/api/epg/programs/",
+        params=_clean({"page": page, "page_size": page_size}),
+    )
+
+
+# ---------------------------------------------------------------------------
+# M3U ACCOUNTS
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def list_m3u_accounts() -> list:
+    """List all configured M3U provider accounts."""
+    return await _client().get("/api/m3u/accounts/")
+
+
+@mcp.tool()
+async def get_m3u_account(account_id: int) -> dict:
+    """Get details for a specific M3U account by ID."""
+    return await _client().get(f"/api/m3u/accounts/{account_id}/")
+
+
+@mcp.tool()
+async def list_m3u_filters(account_id: int) -> list:
+    """List stream filters configured for a specific M3U account."""
+    return await _client().get(f"/api/m3u/accounts/{account_id}/filters/")
+
+
+# ---------------------------------------------------------------------------
+# CHANNEL PROFILES
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def list_channel_profiles() -> list:
+    """List all channel profiles (output profiles used for different clients)."""
+    return await _client().get("/api/channels/profiles/")
+
+
+# ---------------------------------------------------------------------------
+# VOD — Video on Demand
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def list_movies(
+    search: str | None = None,
+    category: str | None = None,
+    year: int | None = None,
+    m3u_account: int | None = None,
+    page: int | None = None,
+    page_size: int | None = None,
+) -> dict:
+    """List VOD movies with optional filtering.
+
+    Filter by title `search`, `category`, release `year`, or `m3u_account` ID.
+    """
+    return await _client().get(
+        "/api/vod/movies/",
+        params=_clean(
+            {
+                "search": search,
+                "category": category,
+                "year": year,
+                "m3u_account": m3u_account,
+                "page": page,
+                "page_size": page_size,
+            }
+        ),
+    )
+
+
+@mcp.tool()
+async def get_movie(movie_id: int) -> dict:
+    """Get details for a specific movie by ID."""
+    return await _client().get(f"/api/vod/movies/{movie_id}/")
+
+
+@mcp.tool()
+async def list_series(
+    search: str | None = None,
+    category: str | None = None,
+    year: int | None = None,
+    m3u_account: int | None = None,
+    page: int | None = None,
+    page_size: int | None = None,
+) -> dict:
+    """List VOD TV series with optional filtering."""
+    return await _client().get(
+        "/api/vod/series/",
+        params=_clean(
+            {
+                "search": search,
+                "category": category,
+                "year": year,
+                "m3u_account": m3u_account,
+                "page": page,
+                "page_size": page_size,
+            }
+        ),
+    )
+
+
+@mcp.tool()
+async def get_series(series_id: int) -> dict:
+    """Get details for a specific TV series by ID."""
+    return await _client().get(f"/api/vod/series/{series_id}/")
+
+
+@mcp.tool()
+async def list_episodes(
+    series_id: int | None = None,
+    season_number: int | None = None,
+    search: str | None = None,
+    page: int | None = None,
+    page_size: int | None = None,
+) -> dict:
+    """List VOD episodes, optionally filtered by series and/or season."""
+    return await _client().get(
+        "/api/vod/episodes/",
+        params=_clean(
+            {
+                "series": series_id,
+                "season_number": season_number,
+                "search": search,
+                "page": page,
+                "page_size": page_size,
+            }
+        ),
+    )
+
+
+@mcp.tool()
+async def list_vod_categories(
+    category_type: str | None = None,
+    m3u_account: int | None = None,
+) -> list:
+    """List VOD categories.
+
+    Use `category_type` to filter: "movie" or "series".
+    """
+    return await _client().get(
+        "/api/vod/categories/",
+        params=_clean({"category_type": category_type, "m3u_account": m3u_account}),
+    )
+
+
+# ---------------------------------------------------------------------------
+# SYSTEM
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def get_core_settings() -> list:
+    """Get Dispatcharr core settings (server configuration, defaults, etc.)."""
+    return await _client().get("/api/core/settings/")
+
+
+@mcp.tool()
+async def list_stream_profiles() -> list:
+    """List stream profiles (FFmpeg/Streamlink/VLC output configurations)."""
+    return await _client().get("/api/core/streamprofiles/")
+
+
+@mcp.tool()
+async def get_system_events(
+    limit: int | None = None,
+    offset: int | None = None,
+    event_type: str | None = None,
+) -> dict:
+    """Get recent system events (channel starts, stops, buffering, client connections).
+
+    Use `limit` (default 100, max 1000), `offset` for pagination, and
+    `event_type` to filter by a specific event kind.
+    """
+    return await _client().get(
+        "/api/core/system-events/",
+        params=_clean({"limit": limit, "offset": offset, "event_type": event_type}),
+    )
+
+
+@mcp.tool()
+async def list_stream_delivery_logs(
+    page: int | None = None, page_size: int | None = None
+) -> dict:
+    """List stream delivery/webhook logs from the Connect integrations system."""
+    return await _client().get(
+        "/api/connect/logs/",
+        params=_clean({"page": page, "page_size": page_size}),
+    )
+
+
+@mcp.tool()
+async def list_integrations() -> list:
+    """List all configured Connect integrations (webhooks, API callbacks, scripts)."""
+    return await _client().get("/api/connect/integrations/")
+
+
+@mcp.tool()
+async def list_recordings() -> list:
+    """List all DVR recordings."""
+    return await _client().get("/api/channels/recordings/")
+
+
+@mcp.tool()
+async def get_recording(recording_id: int) -> dict:
+    """Get details for a specific DVR recording by ID."""
+    return await _client().get(f"/api/channels/recordings/{recording_id}/")
+
+
+# ---------------------------------------------------------------------------
+# HDHR (HDHomeRun emulation)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def list_hdhr_devices() -> list:
+    """List all configured HDHomeRun virtual tuner devices."""
+    return await _client().get("/api/hdhr/devices/")
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+
+def main() -> None:
+    mcp.run()
+
+
+if __name__ == "__main__":
+    main()
