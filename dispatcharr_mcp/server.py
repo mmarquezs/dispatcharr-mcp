@@ -266,6 +266,47 @@ async def get_epg_source(source_id: int) -> dict:
 
 
 @mcp.tool()
+async def create_epg_source(
+    name: str,
+    source_type: str = "xmltv",
+    url: str | None = None,
+    is_active: bool = True,
+    refresh_interval: int | None = None,
+    priority: int | None = None,
+) -> dict:
+    """Create a new EPG source.
+
+    `source_type` must be one of: ``xmltv`` (default), ``schedules_direct``,
+    or ``dummy``.  For XMLTV sources supply the `url` pointing to an .xml or
+    .xml.gz EPG feed.
+    """
+    data: dict = {"name": name, "source_type": source_type, "is_active": is_active}
+    if url is not None:
+        data["url"] = url
+    if refresh_interval is not None:
+        data["refresh_interval"] = refresh_interval
+    if priority is not None:
+        data["priority"] = priority
+    return await _client().post("/api/epg/sources/", data=data)
+
+
+@mcp.tool()
+async def update_epg_source(source_id: int, fields: dict) -> dict:
+    """Partially update an EPG source.
+
+    Pass any subset of EPG source fields as `fields`
+    (e.g. ``{"url": "https://...", "is_active": True}``).
+    """
+    return await _client().patch(f"/api/epg/sources/{source_id}/", data=fields)
+
+
+@mcp.tool()
+async def delete_epg_source(source_id: int) -> dict:
+    """Delete an EPG source by ID."""
+    return await _client().delete(f"/api/epg/sources/{source_id}/")
+
+
+@mcp.tool()
 async def list_epg_data(page: int | None = None, page_size: int | None = None) -> dict:
     """List EPG data entries (programme metadata from EPG sources)."""
     return await _client().get(
@@ -300,6 +341,62 @@ async def list_m3u_accounts() -> list:
 async def get_m3u_account(account_id: int) -> dict:
     """Get details for a specific M3U account by ID."""
     return await _client().get(f"/api/m3u/accounts/{account_id}/")
+
+
+@mcp.tool()
+async def create_m3u_account(
+    name: str,
+    server_url: str | None = None,
+    max_streams: int = 0,
+    is_active: bool = True,
+    account_type: str = "STD",
+    username: str | None = None,
+    password: str | None = None,
+    refresh_interval: int | None = None,
+) -> dict:
+    """Create a new M3U provider account.
+
+    `account_type` is ``STD`` (standard M3U URL, the default) or ``XC``
+    (Xtream Codes).  For a standard M3U simply pass `server_url`.  Set
+    `max_streams` to ``0`` for unlimited concurrent streams.
+    """
+    data: dict = {
+        "name": name,
+        "is_active": is_active,
+        "account_type": account_type,
+        "max_streams": max_streams,
+    }
+    if server_url is not None:
+        data["server_url"] = server_url
+    if username is not None:
+        data["username"] = username
+    if password is not None:
+        data["password"] = password
+    if refresh_interval is not None:
+        data["refresh_interval"] = refresh_interval
+    return await _client().post("/api/m3u/accounts/", data=data)
+
+
+@mcp.tool()
+async def update_m3u_account(account_id: int, fields: dict) -> dict:
+    """Partially update an M3U account.
+
+    Pass any subset of M3U account fields as `fields`
+    (e.g. ``{"name": "New Name", "is_active": False}``).
+    """
+    return await _client().patch(f"/api/m3u/accounts/{account_id}/", data=fields)
+
+
+@mcp.tool()
+async def delete_m3u_account(account_id: int) -> dict:
+    """Delete an M3U account by ID."""
+    return await _client().delete(f"/api/m3u/accounts/{account_id}/")
+
+
+@mcp.tool()
+async def refresh_m3u_account(account_id: int) -> dict:
+    """Trigger an immediate refresh/re-import of an M3U account's streams."""
+    return await _client().post(f"/api/m3u/refresh/{account_id}/")
 
 
 @mcp.tool()

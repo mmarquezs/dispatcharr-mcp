@@ -10,8 +10,8 @@ An [MCP](https://modelcontextprotocol.io) server for [Dispatcharr](https://githu
 | **Channel Groups** | `list_channel_groups`, `create_channel_group`, `delete_channel_group` |
 | **Streams** | `list_streams`, `get_stream`, `create_channel_from_stream` |
 | **Proxy / Live** | `get_proxy_status`, `get_channel_proxy_status`, `change_channel_stream`, `next_channel_stream`, `stop_channel_stream`, `stop_channel_client` |
-| **EPG** | `list_epg_sources`, `get_epg_source`, `list_epg_data`, `list_epg_programs` |
-| **M3U Accounts** | `list_m3u_accounts`, `get_m3u_account`, `list_m3u_filters` |
+| **EPG** | `list_epg_sources`, `get_epg_source`, `create_epg_source`, `update_epg_source`, `delete_epg_source`, `list_epg_data`, `list_epg_programs` |
+| **M3U Accounts** | `list_m3u_accounts`, `get_m3u_account`, `create_m3u_account`, `update_m3u_account`, `delete_m3u_account`, `refresh_m3u_account`, `list_m3u_filters` |
 | **Channel Profiles** | `list_channel_profiles` |
 | **VOD** | `list_movies`, `get_movie`, `list_series`, `get_series`, `list_episodes`, `list_vod_categories` |
 | **System** | `get_core_settings`, `list_stream_profiles`, `get_system_events`, `list_integrations`, `list_stream_delivery_logs` |
