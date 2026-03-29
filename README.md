@@ -2,6 +2,17 @@
 
 An [MCP](https://modelcontextprotocol.io) server for [Dispatcharr](https://github.com/Dispatcharr/Dispatcharr) — giving AI agents full control over your IPTV streams, channels, EPG, and VOD library.
 
+## Authentication
+
+Two modes are supported — `DISPATCHARR_API_KEY` takes priority if set:
+
+| Mode | Variables needed |
+|------|------------------|
+| API Key (stateless, no token expiry) | `DISPATCHARR_URL` + `DISPATCHARR_API_KEY` |
+| JWT (username/password) | `DISPATCHARR_URL` + `DISPATCHARR_USERNAME` + `DISPATCHARR_PASSWORD` |
+
+To generate an API key: Dispatcharr UI → **System → Users** → edit your user → copy the API Key field.
+
 ## Tools
 
 | Domain | Tools |
@@ -22,13 +33,7 @@ An [MCP](https://modelcontextprotocol.io) server for [Dispatcharr](https://githu
 
 - Python 3.10+
 - A running Dispatcharr instance (v0.20+)
-- A Dispatcharr user account (username + password)
-
-## Authentication
-
-This MCP uses **JWT authentication**. It logs in with your Dispatcharr username and password, obtains a JWT access token, and automatically refreshes it as needed. No static API key is required.
-
-It is recommended to create a dedicated Dispatcharr user (e.g. `mcp`) rather than using your admin account.
+- A Dispatcharr API key **or** a username + password
 
 ## Installation
 
@@ -86,17 +91,6 @@ export DISPATCHARR_API_KEY=your-api-key   # or use USERNAME + PASSWORD below
 
 .venv/bin/dispatcharr-mcp
 ```
-
-## Authentication
-
-Two modes are supported — `DISPATCHARR_API_KEY` takes priority if set:
-
-| Mode | Variables needed |
-|------|------------------|
-| API Key (stateless, no token expiry) | `DISPATCHARR_URL` + `DISPATCHARR_API_KEY` |
-| JWT (username/password) | `DISPATCHARR_URL` + `DISPATCHARR_USERNAME` + `DISPATCHARR_PASSWORD` |
-
-To generate an API key: Dispatcharr UI → **System → Users** → edit your user → copy the API Key field.
 
 ## Environment Variables
 
