@@ -41,7 +41,25 @@ python3 -m venv .venv
 
 ## Usage
 
-### VS Code (`mcp.json`)
+### VS Code (`mcp.json`) — API Key (recommended)
+
+```json
+{
+  "servers": {
+    "dispatcharr": {
+      "type": "stdio",
+      "command": "/path/to/dispatcharr-mcp/.venv/bin/dispatcharr-mcp",
+      "args": [],
+      "env": {
+        "DISPATCHARR_URL": "http://your-dispatcharr-host:9191",
+        "DISPATCHARR_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+### VS Code (`mcp.json`) — Username/Password (JWT)
 
 ```json
 {
@@ -64,19 +82,30 @@ python3 -m venv .venv
 
 ```bash
 export DISPATCHARR_URL=http://dispatcharr.local:9191
-export DISPATCHARR_USERNAME=mcp
-export DISPATCHARR_PASSWORD=your-password
+export DISPATCHARR_API_KEY=your-api-key   # or use USERNAME + PASSWORD below
 
 .venv/bin/dispatcharr-mcp
 ```
+
+## Authentication
+
+Two modes are supported — `DISPATCHARR_API_KEY` takes priority if set:
+
+| Mode | Variables needed |
+|------|------------------|
+| API Key (stateless, no token expiry) | `DISPATCHARR_URL` + `DISPATCHARR_API_KEY` |
+| JWT (username/password) | `DISPATCHARR_URL` + `DISPATCHARR_USERNAME` + `DISPATCHARR_PASSWORD` |
+
+To generate an API key: Dispatcharr UI → **System → Users** → edit your user → copy the API Key field.
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DISPATCHARR_URL` | ✅ | Base URL of your Dispatcharr instance |
-| `DISPATCHARR_USERNAME` | ✅ | Dispatcharr username |
-| `DISPATCHARR_PASSWORD` | ✅ | Dispatcharr password |
+| `DISPATCHARR_API_KEY` | ✅ (or user+pass) | Static API key — preferred auth method |
+| `DISPATCHARR_USERNAME` | ✅ (or api key) | Dispatcharr username (JWT fallback) |
+| `DISPATCHARR_PASSWORD` | ✅ (or api key) | Dispatcharr password (JWT fallback) |
 
 ## License
 
