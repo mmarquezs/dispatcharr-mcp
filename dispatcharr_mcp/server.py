@@ -2,6 +2,7 @@
 
 Tools are grouped by domain:
   • Channels       — list, get, create, update, delete channels & groups
+  • Channels ext.  — bulk ops, EPG matching, stream assignment, summaries
   • Streams        — list/get raw M3U streams by source
   • Proxy          — live stream status and control (change, stop, failover)
   • EPG            — EPG sources and programme data
@@ -104,6 +105,116 @@ async def delete_channel(channel_id: int) -> dict:
 async def get_channel_streams(channel_id: int) -> dict:
     """Get all streams (M3U sources) assigned to a specific channel."""
     return await _client().get(f"/api/channels/channels/{channel_id}/streams/")
+
+
+# ---------------------------------------------------------------------------
+# CHANNELS (extended — bulk operations, EPG matching, summaries)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def bulk_delete_channels(channel_ids: list[int]) -> dict:
+    """Bulk delete multiple channels by their IDs.
+
+    Pass a list of channel integer IDs. Use cases include removing
+    duplicate channels identified via ``list_channels``.
+    """
+    return await _client().post(
+        "/api/channels/channels/bulk-delete/",
+        data={"ids": channel_ids},
+    )
+
+
+@mcp.tool()
+async def batch_set_channel_epg(
+    channel_ids: list[int],
+    epg_source_id: int | None = None,
+) -> dict:
+    """Batch set the EPG source for multiple channels at once.
+
+    Pass a list of ``channel_ids`` and optionally an ``epg_source_id``.
+    """
+    return await _client().post(
+        "/api/channels/channels/batch-set-epg/",
+        data=_clean({"ids": channel_ids, "epg_source_id": epg_source_id}),
+    )
+
+
+@mcp.tool()
+async def match_channel_epg() -> dict:
+    """Auto-match channels to EPG programmes based on name/TVG-ID.
+
+    Dispatcharr analyses channel names and TVG IDs to find matching
+    EPG entries. Useful after adding new channels or EPG sources.
+    """
+    return await _client().post("/api/channels/channels/match-epg/")
+
+
+@mcp.tool()
+async def set_channel_logos_from_epg() -> dict:
+    """Update channel logos using artwork from matched EPG data."""
+    return await _client().post("/api/channels/channels/set-logos-from-epg/")
+
+
+@mcp.tool()
+async def set_channel_names_from_epg() -> dict:
+    """Update channel names using names from matched EPG data."""
+    return await _client().post("/api/channels/channels/set-names-from-epg/")
+
+
+@mcp.tool()
+async def set_channel_tvg_ids_from_epg() -> dict:
+    """Update channel TVG IDs using data from matched EPG sources."""
+    return await _client().post("/api/channels/channels/set-tvg-ids-from-epg/")
+
+
+@mcp.tool()
+async def assign_streams_to_channel(
+    channel_id: int,
+    stream_ids: list[int],
+) -> dict:
+    """Assign one or more streams to a channel.
+
+    Pass the target ``channel_id`` and a list of ``stream_ids`` to link.
+    """
+    return await _client().post(
+        "/api/channels/channels/assign/",
+        data={"channel_id": channel_id, "stream_ids": stream_ids},
+    )
+
+
+@mcp.tool()
+async def get_channels_by_uuids(uuids: list[str]) -> dict:
+    """Look up channels by a list of UUID strings."""
+    return await _client().post(
+        "/api/channels/channels/by-uuids/",
+        data={"uuids": uuids},
+    )
+
+
+@mcp.tool()
+async def get_channel_summary() -> dict:
+    """Get channel summary statistics (total count, group breakdowns, etc.)."""
+    return await _client().get("/api/channels/channels/summary/")
+
+
+@mcp.tool()
+async def list_channel_ids() -> dict:
+    """List all channel IDs (lightweight endpoint for bulk operations)."""
+    return await _client().get("/api/channels/channels/ids/")
+
+
+@mcp.tool()
+async def reorder_channel_streams(channel_id: int, stream_order: list[int]) -> dict:
+    """Reorder the streams assigned to a channel.
+
+    Pass the ``channel_id`` and ``stream_order`` — a list of stream IDs in
+    the desired priority order (first = highest priority).
+    """
+    return await _client().post(
+        f"/api/channels/channels/{channel_id}/reorder/",
+        data={"stream_order": stream_order},
+    )
 
 
 # ---------------------------------------------------------------------------
