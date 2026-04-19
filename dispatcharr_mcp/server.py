@@ -633,15 +633,16 @@ async def get_backup_status(
 
     Pass the `task_id` returned by `create_backup` or `restore_backup`.
 
-    By default, polls until the task reaches a terminal state (completed/failed)
-    or the timeout is reached. Set `wait=False` for a single status check.
+    By default, polls every 2 seconds until the task reaches a terminal state
+    (completed/failed) or the timeout is reached. Set `wait=False` for a
+    single instant status check.
     Returns status, progress details, and result when complete.
     """
     import asyncio
 
     terminal = {"completed", "failed", "cancelled", "success", "error"}
     elapsed = 0
-    interval = 3
+    interval = 2
 
     while True:
         result = await _client().get(f"/api/backups/status/{task_id}/")
@@ -705,13 +706,43 @@ async def get_backup_schedule() -> dict:
 
 
 @mcp.tool()
-async def update_backup_schedule(fields: dict) -> dict:
+async def update_backup_schedule(
+    enabled: bool | None = None,
+    frequency: str | None = None,
+    time: str | None = None,
+    day_of_week: int | None = None,
+    retention_count: int | None = None,
+    cron_expression: str | None = None,
+) -> dict:
     """Update the backup schedule configuration.
 
-    Pass any subset of schedule fields as `fields`
-    (e.g. ``{"enabled": true, "interval_hours": 24, "retain_count": 7}``).
+    All parameters are optional — only provided fields are changed.
+
+    Args:
+        enabled: Enable or disable scheduled backups.
+        frequency: How often to run backups. Must be ``"daily"`` or ``"weekly"``.
+        time: Time of day to run the backup, in ``"HH:MM"`` format (24h, e.g. ``"03:00"``).
+        day_of_week: Day of week for weekly backups. 0=Sunday, 1=Monday, ..., 6=Saturday.
+            Ignored when frequency is ``"daily"``.
+        retention_count: Number of backups to keep. Older backups are deleted automatically.
+            Set to 0 to keep all backups.
+        cron_expression: Advanced — a custom cron expression (e.g. ``"0 3 * * *"``).
+            Overrides frequency/time/day_of_week when set. Set to empty string to
+            go back to simple frequency mode.
     """
-    return await _client().put("/api/backups/schedule/update/", data=fields)
+    return await _client().put(
+        "/api/backups/schedule/update/",
+        data=_clean(
+            {
+                "enabled": enabled,
+                "frequency": frequency,
+                "time": time,
+                "day_of_week": day_of_week,
+                "retention_count": retention_count,
+                "cron_expression": cron_expression,
+            }
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
