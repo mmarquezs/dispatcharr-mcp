@@ -2,6 +2,7 @@
 
 Tools are grouped by domain:
   • Channels       — list, get, create, update, delete channels & groups
+  • Channels ext.  — bulk ops, EPG matching, stream assignment, summaries
   • Streams        — list/get raw M3U streams by source
   • Proxy          — live stream status and control (change, stop, failover)
   • EPG            — EPG sources and programme data
@@ -104,6 +105,231 @@ async def delete_channel(channel_id: int) -> dict:
 async def get_channel_streams(channel_id: int) -> dict:
     """Get all streams (M3U sources) assigned to a specific channel."""
     return await _client().get(f"/api/channels/channels/{channel_id}/streams/")
+
+
+# ---------------------------------------------------------------------------
+# CHANNELS (extended — bulk operations, EPG matching, ordering, summaries)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def bulk_delete_channels(channel_ids: list[int]) -> dict:
+    """Bulk delete multiple channels by their IDs.
+
+    Pass a list of channel integer IDs. Use cases include removing
+    duplicate channels identified via ``list_channels``.
+    """
+    return await _client().delete(
+        "/api/channels/channels/bulk-delete/",
+        params={"ids": ",".join(str(i) for i in channel_ids)},
+    )
+
+
+@mcp.tool()
+async def bulk_edit_channels(updates: list[dict]) -> dict:
+    """Bulk edit multiple channels in a single request.
+
+    Pass a list of update objects, each must include ``id`` (channel primary key).
+    All other fields are optional and support partial updates. Accepted fields
+    per object: ``name``, ``channel_number``, ``channel_group_id``, ``streams``
+    (list of stream IDs — replaces existing), ``logo_id``, ``tvg_id``,
+    ``epg_data_id``, ``user_level``, ``is_adult``.
+
+    All updates are validated before any changes are applied and executed in
+    a single database transaction.
+
+    Example::
+
+        [{"id": 1, "name": "BBC One HD"}, {"id": 2, "channel_group_id": 5}]
+    """
+    return await _client().patch(
+        "/api/channels/channels/edit/bulk/",
+        data=updates,
+    )
+
+
+@mcp.tool()
+async def bulk_rename_channels_regex(
+    channel_ids: list[int],
+    find: str,
+    replace: str,
+    flags: str | None = None,
+) -> dict:
+    """Bulk rename channel names using a server-side regex find/replace.
+
+    Accepts JavaScript-style named groups (e.g. ``(?<name>...)``) and converts
+    them to Python syntax. Supports flags: ``i`` (IGNORECASE). Replacement
+    tokens like ``$1``, ``$&`` and ``$<name>`` are translated to Python.
+
+    Example: find ``"HD$"`` replace ``""`` flags ``"i"`` to strip trailing "HD".
+    """
+    return await _client().post(
+        "/api/channels/channels/edit/bulk-regex/",
+        data=_clean({
+            "channel_ids": channel_ids,
+            "find": find,
+            "replace": replace,
+            "flags": flags,
+        }),
+    )
+
+
+@mcp.tool()
+async def bulk_create_channels_from_streams(
+    stream_ids: list[int],
+    channel_profile_ids: list[int] | None = None,
+    starting_channel_number: int | None = None,
+) -> dict:
+    """Asynchronously bulk create channels from stream IDs.
+
+    Returns a task ID to track progress via WebSocket. This is the recommended
+    approach for large bulk operations.
+
+    ``channel_profile_ids`` behaviour: omitted = add to ALL profiles (default);
+    empty list ``[]`` = add to NO profiles; specific IDs = add to those only.
+    ``starting_channel_number``: null = use provider numbers; 0 = lowest
+    available; other = start from that number.
+    """
+    return await _client().post(
+        "/api/channels/channels/from-stream/bulk/",
+        data=_clean({
+            "stream_ids": stream_ids,
+            "channel_profile_ids": channel_profile_ids,
+            "starting_channel_number": starting_channel_number,
+        }),
+    )
+
+
+@mcp.tool()
+async def batch_set_channel_epg(
+    associations: list[dict],
+) -> dict:
+    """Associate multiple channels with EPG data without triggering a full refresh.
+
+    Pass an ``associations`` list where each item has ``channel_id`` (int) and
+    ``epg_data_id`` (int or null to remove linkage).
+
+    Example::
+
+        [{"channel_id": 1, "epg_data_id": 42}, {"channel_id": 2, "epg_data_id": null}]
+    """
+    return await _client().post(
+        "/api/channels/channels/batch-set-epg/",
+        data={"associations": associations},
+    )
+
+
+@mcp.tool()
+async def set_channel_epg(channel_id: int, epg_data_id: int) -> dict:
+    """Set EPG data for a single channel and refresh program data."""
+    return await _client().post(
+        f"/api/channels/channels/{channel_id}/set-epg/",
+        data={"epg_data_id": epg_data_id},
+    )
+
+
+@mcp.tool()
+async def match_channel_epg(
+    channel_ids: list[int] | None = None,
+) -> dict:
+    """Auto-match channels to EPG programmes based on name/TVG-ID.
+
+    Kicks off a Celery task that fuzzy-matches channels with EPG data.
+    If ``channel_ids`` is provided, only those channels are processed;
+    otherwise all channels without EPG are processed.
+    """
+    return await _client().post(
+        "/api/channels/channels/match-epg/",
+        data=_clean({"channel_ids": channel_ids}),
+    )
+
+
+@mcp.tool()
+async def match_channel_epg_single(channel_id: int) -> dict:
+    """Try to auto-match a specific channel with EPG data."""
+    return await _client().post(
+        f"/api/channels/channels/{channel_id}/match-epg/",
+        data={},
+    )
+
+
+@mcp.tool()
+async def set_channel_logos_from_epg() -> dict:
+    """Trigger a Celery task to update channel logos from matched EPG data."""
+    return await _client().post("/api/channels/channels/set-logos-from-epg/", data={})
+
+
+@mcp.tool()
+async def set_channel_names_from_epg() -> dict:
+    """Trigger a Celery task to update channel names from matched EPG data."""
+    return await _client().post("/api/channels/channels/set-names-from-epg/", data={})
+
+
+@mcp.tool()
+async def set_channel_tvg_ids_from_epg() -> dict:
+    """Trigger a Celery task to update channel TVG-IDs from matched EPG data."""
+    return await _client().post("/api/channels/channels/set-tvg-ids-from-epg/", data={})
+
+
+@mcp.tool()
+async def assign_channel_numbers(
+    channel_ids: list[int],
+    starting_number: float | None = None,
+) -> dict:
+    """Auto-assign channel numbers in bulk by an ordered list of channel IDs.
+
+    Pass an ordered list of ``channel_ids``. Optionally set
+    ``starting_number`` for the first channel (can be decimal).
+    Channels receive sequential numbers from that starting point.
+    """
+    return await _client().post(
+        "/api/channels/channels/assign/",
+        data=_clean({"channel_ids": channel_ids, "starting_number": starting_number}),
+    )
+
+
+@mcp.tool()
+async def get_channels_by_uuids(uuids: list[str]) -> dict:
+    """Look up channels by a list of UUID strings."""
+    return await _client().post(
+        "/api/channels/channels/by-uuids/",
+        data={"uuids": uuids},
+    )
+
+
+@mcp.tool()
+async def get_channel_summary() -> dict:
+    """Get a lightweight channel list for the TV Guide (summary view)."""
+    return await _client().get("/api/channels/channels/summary/")
+
+
+@mcp.tool()
+async def list_channel_ids() -> dict:
+    """List all channel IDs (lightweight endpoint for bulk operations)."""
+    return await _client().get("/api/channels/channels/ids/")
+
+
+@mcp.tool()
+async def reorder_channel(
+    channel_id: int,
+    insert_after_id: int | None = None,
+) -> dict:
+    """Reorder a channel's position in the channel list.
+
+    Move ``channel_id`` to appear after ``insert_after_id`` (or to the
+    start if null). The channel receives the next whole number after the
+    target, and all subsequent channels are renumbered accordingly.
+    """
+    return await _client().post(
+        f"/api/channels/channels/{channel_id}/reorder/",
+        data={"insert_after_id": insert_after_id},
+    )
+
+
+@mcp.tool()
+async def cleanup_channel_groups() -> dict:
+    """Delete all channel groups that have no associations (no channels or M3U accounts)."""
+    return await _client().post("/api/channels/groups/cleanup/", data={})
 
 
 # ---------------------------------------------------------------------------
