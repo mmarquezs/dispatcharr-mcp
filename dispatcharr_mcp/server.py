@@ -7,6 +7,7 @@ Tools are grouped by domain:
   • EPG            — EPG sources and programme data
   • M3U Accounts   — manage M3U provider accounts
   • VOD            — movies, series, episodes
+  • Backups        — create, list, download, restore, schedule backups
   • System         — settings, stream profiles, system events
 """
 
@@ -596,6 +597,94 @@ async def get_recording(recording_id: int) -> dict:
 async def list_hdhr_devices() -> list:
     """List all configured HDHomeRun virtual tuner devices."""
     return await _client().get("/api/hdhr/devices/")
+
+
+# ---------------------------------------------------------------------------
+# BACKUPS
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def create_backup() -> dict:
+    """Trigger a new backup of the Dispatcharr database and configuration.
+
+    Returns a task object with a `task_id` that can be polled with
+    `get_backup_status` to track progress.
+    """
+    return await _client().post("/api/backups/create/")
+
+
+@mcp.tool()
+async def list_backups() -> list:
+    """List all available backups.
+
+    Returns filename, size, creation date, and other metadata for each backup.
+    """
+    return await _client().get("/api/backups/")
+
+
+@mcp.tool()
+async def get_backup_status(task_id: str) -> dict:
+    """Check the progress of a backup or restore task.
+
+    Pass the `task_id` returned by `create_backup` or `restore_backup`.
+    Returns status (pending/running/completed/failed) and progress details.
+    """
+    return await _client().get(f"/api/backups/status/{task_id}/")
+
+
+@mcp.tool()
+async def download_backup(filename: str) -> dict:
+    """Get a download URL for a backup file.
+
+    Since MCP tools cannot return binary files, this returns a dict containing
+    the download URL with an authenticated token. Open the URL in a browser
+    or use curl/wget to download the backup archive.
+    """
+    token_data = await _client().get(
+        f"/api/backups/{filename}/download-token/"
+    )
+    token = token_data.get("token", "") if isinstance(token_data, dict) else ""
+    base = _client()._base
+    return {
+        "url": f"{base}/api/backups/{filename}/download/?token={token}",
+        "filename": filename,
+    }
+
+
+@mcp.tool()
+async def restore_backup(filename: str) -> dict:
+    """Restore Dispatcharr from a specific backup file.
+
+    WARNING: This overwrites the current database and configuration.
+    Returns a task object — use `get_backup_status` to track progress.
+    """
+    return await _client().post(f"/api/backups/{filename}/restore/")
+
+
+@mcp.tool()
+async def delete_backup(filename: str) -> dict:
+    """Delete a backup file by its filename."""
+    return await _client().delete(f"/api/backups/{filename}/delete/")
+
+
+@mcp.tool()
+async def get_backup_schedule() -> dict:
+    """Get the current backup schedule configuration.
+
+    Returns enabled status, interval, retention policy, and other settings.
+    """
+    return await _client().get("/api/backups/schedule/")
+
+
+@mcp.tool()
+async def update_backup_schedule(fields: dict) -> dict:
+    """Update the backup schedule configuration.
+
+    Pass any subset of schedule fields as `fields`
+    (e.g. ``{"enabled": true, "interval_hours": 24, "retain_count": 7}``).
+    """
+    return await _client().put("/api/backups/schedule/update/", data=fields)
 
 
 # ---------------------------------------------------------------------------
