@@ -624,13 +624,40 @@ async def list_backups() -> list:
 
 
 @mcp.tool()
-async def get_backup_status(task_id: str) -> dict:
+async def get_backup_status(
+    task_id: str,
+    wait: bool = True,
+    timeout: int = 120,
+) -> dict:
     """Check the progress of a backup or restore task.
 
     Pass the `task_id` returned by `create_backup` or `restore_backup`.
-    Returns status (pending/running/completed/failed) and progress details.
+
+    By default, polls until the task reaches a terminal state (completed/failed)
+    or the timeout is reached. Set `wait=False` for a single status check.
+    Returns status, progress details, and result when complete.
     """
-    return await _client().get(f"/api/backups/status/{task_id}/")
+    import asyncio
+
+    terminal = {"completed", "failed", "cancelled", "success", "error"}
+    elapsed = 0
+    interval = 3
+
+    while True:
+        result = await _client().get(f"/api/backups/status/{task_id}/")
+        if not wait:
+            return result
+        status = result.get("status", "") if isinstance(result, dict) else ""
+        if status.lower() in terminal:
+            return result
+        if elapsed >= timeout:
+            result["_timed_out"] = True
+            result["_message"] = (
+                f"Timeout after {timeout}s. Call again with the same task_id to continue waiting."
+            )
+            return result
+        await asyncio.sleep(interval)
+        elapsed += interval
 
 
 @mcp.tool()
