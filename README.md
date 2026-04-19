@@ -28,6 +28,7 @@ To generate an API key: Dispatcharr UI → **System → Users** → edit your us
 | **System** | `get_core_settings`, `list_stream_profiles`, `get_system_events`, `list_integrations`, `list_stream_delivery_logs` |
 | **DVR** | `list_recordings`, `get_recording` |
 | **HDHomeRun** | `list_hdhr_devices` |
+| **Backups** | `create_backup`, `list_backups`, `get_backup_status`, `download_backup`, `restore_backup`, `delete_backup`, `get_backup_schedule`, `update_backup_schedule` |
 
 ## Requirements
 

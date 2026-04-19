@@ -7,6 +7,7 @@ Tools are grouped by domain:
   • EPG            — EPG sources and programme data
   • M3U Accounts   — manage M3U provider accounts
   • VOD            — movies, series, episodes
+  • Backups        — create, list, download, restore, schedule backups
   • System         — settings, stream profiles, system events
 """
 
@@ -596,6 +597,136 @@ async def get_recording(recording_id: int) -> dict:
 async def list_hdhr_devices() -> list:
     """List all configured HDHomeRun virtual tuner devices."""
     return await _client().get("/api/hdhr/devices/")
+
+
+# ---------------------------------------------------------------------------
+# BACKUPS
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def create_backup() -> dict:
+    """Trigger a new backup of the Dispatcharr database and configuration.
+
+    Returns a task object with a `task_id` that can be polled with
+    `get_backup_status` to track progress.
+    """
+    return await _client().post("/api/backups/create/")
+
+
+@mcp.tool()
+async def list_backups() -> list:
+    """List all available backups.
+
+    Returns filename, size, creation date, and other metadata for each backup.
+    """
+    return await _client().get("/api/backups/")
+
+
+@mcp.tool()
+async def get_backup_status(
+    task_id: str,
+    wait: bool = True,
+    timeout: int = 120,
+) -> dict:
+    """Check the progress of a backup or restore task.
+
+    Pass the `task_id` returned by `create_backup` or `restore_backup`.
+
+    By default, polls every 2 seconds until the task reaches a terminal state
+    (completed/failed) or the timeout is reached. Set `wait=False` for a
+    single instant status check.
+    Returns status, progress details, and result when complete.
+    """
+    import asyncio
+
+    terminal = {"completed", "failed", "cancelled", "success", "error"}
+    elapsed = 0
+    interval = 2
+
+    while True:
+        result = await _client().get(f"/api/backups/status/{task_id}/")
+        if not wait:
+            return result
+        status = result.get("status", "") if isinstance(result, dict) else ""
+        if status.lower() in terminal:
+            return result
+        if elapsed >= timeout:
+            result["_timed_out"] = True
+            result["_message"] = (
+                f"Timeout after {timeout}s. Call again with the same task_id to continue waiting."
+            )
+            return result
+        await asyncio.sleep(interval)
+        elapsed += interval
+
+
+@mcp.tool()
+async def download_backup(filename: str) -> dict:
+    """Get a download URL for a backup file.
+
+    Since MCP tools cannot return binary files, this returns a dict containing
+    the download URL with an authenticated token. Open the URL in a browser
+    or use curl/wget to download the backup archive.
+    """
+    token_data = await _client().get(
+        f"/api/backups/{filename}/download-token/"
+    )
+    token = token_data.get("token", "") if isinstance(token_data, dict) else ""
+    base = _client()._base
+    return {
+        "url": f"{base}/api/backups/{filename}/download/?token={token}",
+        "filename": filename,
+    }
+
+
+@mcp.tool()
+async def restore_backup(filename: str) -> dict:
+    """Restore Dispatcharr from a specific backup file.
+
+    WARNING: This overwrites the current database and configuration.
+    Returns a task object — use `get_backup_status` to track progress.
+    """
+    return await _client().post(f"/api/backups/{filename}/restore/")
+
+
+@mcp.tool()
+async def delete_backup(filename: str) -> dict:
+    """Delete a backup file by its filename."""
+    return await _client().delete(f"/api/backups/{filename}/delete/")
+
+
+@mcp.tool()
+async def get_backup_schedule() -> dict:
+    """Get the current backup schedule configuration.
+
+    Returns: enabled (bool), frequency (str: "daily"/"weekly"), time (str: "HH:MM"),
+    day_of_week (int: 0-6), retention_count (int), cron_expression (str).
+    """
+    return await _client().get("/api/backups/schedule/")
+
+
+@mcp.tool()
+async def update_backup_schedule(fields: dict) -> dict:
+    """Update the backup schedule configuration.
+
+    Pass any subset of schedule fields as `fields`. Only provided fields are changed.
+
+    Accepted fields:
+        enabled (bool): Enable or disable scheduled backups.
+        frequency (str): How often to run. Must be ``"daily"`` or ``"weekly"``.
+        time (str): Time of day in ``"HH:MM"`` format, 24-hour (e.g. ``"03:00"``).
+        day_of_week (int): Day of week for weekly frequency. 0=Sunday through 6=Saturday.
+            Ignored when frequency is ``"daily"``.
+        retention_count (int): Number of backups to keep. Older ones are auto-deleted.
+            Set to 0 to keep all.
+        cron_expression (str): Custom cron expression (e.g. ``"0 3 * * *"``).
+            Overrides frequency/time/day_of_week when set. Set to ``""`` to go
+            back to simple frequency mode.
+
+    Example: ``{"enabled": true, "frequency": "daily", "time": "03:00", "retention_count": 5}``
+    """
+    return await _client().put("/api/backups/schedule/update/", data=fields)
 
 
 # ---------------------------------------------------------------------------
