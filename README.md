@@ -38,7 +38,7 @@ To generate an API key: Dispatcharr UI → **System → Users** → edit your us
 ## Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/dispatcharr-mcp
+git clone https://github.com/mmarquezs/dispatcharr-mcp
 cd dispatcharr-mcp
 python3 -m venv .venv
 .venv/bin/pip install -e .
@@ -104,3 +104,34 @@ export DISPATCHARR_API_KEY=your-api-key   # or use USERNAME + PASSWORD below
 ## License
 
 MIT
+
+## Contributing
+
+This project follows a **per-API-group** contribution pattern. Each Dispatcharr API domain (Backups, Channels, EPG, etc.) is developed as a separate unit.
+
+### Adding a new API group
+
+1. Check existing [issues](../../issues) for the API group you want to work on, or create one
+2. Create a branch: `feat/<group-name>-tools` (e.g. `feat/backup-tools`)
+3. Add tools to `dispatcharr_mcp/server.py` following the existing pattern:
+   - Group tools under a comment header (e.g. `# BACKUPS`)
+   - Use `@mcp.tool()` decorator
+   - Use `_client()` for API calls and `_clean()` to strip None params
+   - Add descriptive docstrings — they become the tool descriptions visible to AI agents
+4. Update the Tools table in this README
+5. Open a PR against `main`
+
+### Tool naming convention
+
+- `list_<resource>` — paginated list with optional filters
+- `get_<resource>` — single item by ID
+- `create_<resource>` — new item
+- `update_<resource>` — partial update by ID (accepts `fields: dict`)
+- `delete_<resource>` — delete by ID
+- Action verbs for operations: `refresh_`, `restore_`, `trigger_`, etc.
+
+### Code style
+
+- Python 3.10+ (use `X | None` not `Optional[X]`)
+- Lint with `ruff check dispatcharr_mcp/`
+- No external dependencies beyond `mcp[cli]` and `httpx`
