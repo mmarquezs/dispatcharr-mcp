@@ -117,5 +117,5 @@ class DispatcharrClient:
     async def patch(self, path: str, data: dict) -> Any:
         return await self._request("PATCH", path, json=data)
 
-    async def delete(self, path: str) -> dict:
-        return await self._request("DELETE", path)
+    async def delete(self, path: str, params: dict | None = None) -> dict:
+        return await self._request("DELETE", path, params=params)
