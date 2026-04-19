@@ -700,49 +700,33 @@ async def delete_backup(filename: str) -> dict:
 async def get_backup_schedule() -> dict:
     """Get the current backup schedule configuration.
 
-    Returns enabled status, interval, retention policy, and other settings.
+    Returns: enabled (bool), frequency (str: "daily"/"weekly"), time (str: "HH:MM"),
+    day_of_week (int: 0-6), retention_count (int), cron_expression (str).
     """
     return await _client().get("/api/backups/schedule/")
 
 
 @mcp.tool()
-async def update_backup_schedule(
-    enabled: bool | None = None,
-    frequency: str | None = None,
-    time: str | None = None,
-    day_of_week: int | None = None,
-    retention_count: int | None = None,
-    cron_expression: str | None = None,
-) -> dict:
+async def update_backup_schedule(fields: dict) -> dict:
     """Update the backup schedule configuration.
 
-    All parameters are optional — only provided fields are changed.
+    Pass any subset of schedule fields as `fields`. Only provided fields are changed.
 
-    Args:
-        enabled: Enable or disable scheduled backups.
-        frequency: How often to run backups. Must be ``"daily"`` or ``"weekly"``.
-        time: Time of day to run the backup, in ``"HH:MM"`` format (24h, e.g. ``"03:00"``).
-        day_of_week: Day of week for weekly backups. 0=Sunday, 1=Monday, ..., 6=Saturday.
+    Accepted fields:
+        enabled (bool): Enable or disable scheduled backups.
+        frequency (str): How often to run. Must be ``"daily"`` or ``"weekly"``.
+        time (str): Time of day in ``"HH:MM"`` format, 24-hour (e.g. ``"03:00"``).
+        day_of_week (int): Day of week for weekly frequency. 0=Sunday through 6=Saturday.
             Ignored when frequency is ``"daily"``.
-        retention_count: Number of backups to keep. Older backups are deleted automatically.
-            Set to 0 to keep all backups.
-        cron_expression: Advanced — a custom cron expression (e.g. ``"0 3 * * *"``).
-            Overrides frequency/time/day_of_week when set. Set to empty string to
-            go back to simple frequency mode.
+        retention_count (int): Number of backups to keep. Older ones are auto-deleted.
+            Set to 0 to keep all.
+        cron_expression (str): Custom cron expression (e.g. ``"0 3 * * *"``).
+            Overrides frequency/time/day_of_week when set. Set to ``""`` to go
+            back to simple frequency mode.
+
+    Example: ``{"enabled": true, "frequency": "daily", "time": "03:00", "retention_count": 5}``
     """
-    return await _client().put(
-        "/api/backups/schedule/update/",
-        data=_clean(
-            {
-                "enabled": enabled,
-                "frequency": frequency,
-                "time": time,
-                "day_of_week": day_of_week,
-                "retention_count": retention_count,
-                "cron_expression": cron_expression,
-            }
-        ),
-    )
+    return await _client().put("/api/backups/schedule/update/", data=fields)
 
 
 # ---------------------------------------------------------------------------
