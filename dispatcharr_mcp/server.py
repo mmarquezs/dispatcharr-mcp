@@ -576,6 +576,61 @@ async def list_integrations() -> list:
 
 
 @mcp.tool()
+async def update_channel_group(group_id: int, name: str) -> dict:
+    """Rename a channel group.
+
+    Note: groups that have M3U account associations cannot be renamed —
+    the API will return an error in that case.
+    """
+    return await _client().patch(f"/api/channels/groups/{group_id}/", data={"name": name})
+
+
+# ---------------------------------------------------------------------------
+# EPG — current programmes and TV grid
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def get_current_programs(channel_uuids: list[str] | None = None) -> list:
+    """Get the currently-playing programme for channels.
+
+    Pass a list of channel UUIDs to filter to specific channels, or omit
+    `channel_uuids` (or pass null) to fetch the now-playing programme for
+    every channel that has EPG data.
+    """
+    return await _client().post(
+        "/api/epg/current-programs/",
+        data={"channel_uuids": channel_uuids},
+    )
+
+
+@mcp.tool()
+async def get_epg_grid() -> list:
+    """Get the full EPG grid — past hour, now, and next 24 hours.
+
+    Returns programme data across all channels, suitable for building a
+    TV guide view or answering "what's on tonight" style queries.
+    """
+    return await _client().get("/api/epg/grid/")
+
+
+# ---------------------------------------------------------------------------
+# SYSTEM — version
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def get_version() -> dict:
+    """Get the running Dispatcharr application version."""
+    return await _client().get("/api/core/version/")
+
+
+# ---------------------------------------------------------------------------
+# DVR — schedule, manage and control recordings
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
 async def list_recordings() -> list:
     """List all DVR recordings."""
     return await _client().get("/api/channels/recordings/")
@@ -585,6 +640,244 @@ async def list_recordings() -> list:
 async def get_recording(recording_id: int) -> dict:
     """Get details for a specific DVR recording by ID."""
     return await _client().get(f"/api/channels/recordings/{recording_id}/")
+
+
+@mcp.tool()
+async def schedule_recording(
+    channel_id: int,
+    start_time: str,
+    end_time: str,
+) -> dict:
+    """Schedule a new DVR recording.
+
+    `channel_id` is the integer channel ID.
+    `start_time` and `end_time` must be ISO 8601 datetime strings
+    (e.g. ``"2026-04-22T20:00:00Z"``).
+    """
+    return await _client().post(
+        "/api/channels/recordings/",
+        data={"channel": channel_id, "start_time": start_time, "end_time": end_time},
+    )
+
+
+@mcp.tool()
+async def delete_recording(recording_id: int) -> dict:
+    """Delete a DVR recording by ID.
+
+    Also stops any active recording stream and removes the file from disk.
+    """
+    return await _client().delete(f"/api/channels/recordings/{recording_id}/")
+
+
+@mcp.tool()
+async def stop_recording(recording_id: int) -> dict:
+    """Stop an in-progress recording early.
+
+    Retains the partial file so it can still be played back. Use
+    `delete_recording` if you want to remove it entirely.
+    """
+    return await _client().post(f"/api/channels/recordings/{recording_id}/stop/", data={})
+
+
+@mcp.tool()
+async def extend_recording(recording_id: int, extra_minutes: int) -> dict:
+    """Extend an in-progress recording by additional minutes.
+
+    The running stream is not interrupted — the deadline is adjusted
+    dynamically. `extra_minutes` must be a positive integer.
+    """
+    return await _client().post(
+        f"/api/channels/recordings/{recording_id}/extend/",
+        data={"extra_minutes": extra_minutes},
+    )
+
+
+# ---------------------------------------------------------------------------
+# DVR — series recording rules
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def list_series_rules() -> dict:
+    """List all configured DVR series recording rules."""
+    return await _client().get("/api/channels/series-rules/")
+
+
+@mcp.tool()
+async def create_series_rule(
+    tvg_id: str,
+    mode: str = "all",
+    title: str | None = None,
+) -> dict:
+    """Create (or update) a DVR series recording rule.
+
+    `tvg_id` is the EPG channel TVG-ID to record.
+    `mode` is either ``"all"`` (record every episode) or ``"new"``
+    (only episodes not yet recorded).
+    `title` narrows the rule to a specific series title on that channel.
+    Rules are evaluated immediately after creation.
+    """
+    return await _client().post(
+        "/api/channels/series-rules/",
+        data=_clean({"tvg_id": tvg_id, "mode": mode, "title": title}),
+    )
+
+
+@mcp.tool()
+async def delete_series_rule(tvg_id: str) -> dict:
+    """Delete a DVR series rule by TVG-ID.
+
+    Future scheduled recordings for the rule are also removed; already
+    completed recordings are kept.
+    """
+    return await _client().delete(f"/api/channels/series-rules/{tvg_id}/")
+
+
+@mcp.tool()
+async def evaluate_series_rules(tvg_id: str | None = None) -> dict:
+    """Evaluate series recording rules and schedule matching episodes.
+
+    Pass a `tvg_id` to evaluate only rules for that channel, or omit it
+    to evaluate all rules.
+    """
+    return await _client().post(
+        "/api/channels/series-rules/evaluate/",
+        data=_clean({"tvg_id": tvg_id}),
+    )
+
+
+# ---------------------------------------------------------------------------
+# DVR — recurring recording rules (time-based)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def list_recurring_rules() -> list:
+    """List all recurring DVR recording rules."""
+    return await _client().get("/api/channels/recurring-rules/")
+
+
+@mcp.tool()
+async def create_recurring_rule(
+    channel_id: int,
+    name: str,
+    start_time: str,
+    end_time: str,
+    days_of_week: list[int] | None = None,
+    enabled: bool = True,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> dict:
+    """Create a recurring DVR recording rule.
+
+    `start_time` / `end_time` are wall-clock times in ``"HH:MM:SS"`` format.
+    `days_of_week` is a list of integers where 0 = Monday … 6 = Sunday.
+    `start_date` / `end_date` are optional ISO date strings (``"YYYY-MM-DD"``)
+    that bound when the rule is active.
+    """
+    data: dict = {
+        "channel": channel_id,
+        "name": name,
+        "start_time": start_time,
+        "end_time": end_time,
+        "enabled": enabled,
+    }
+    if days_of_week is not None:
+        data["days_of_week"] = days_of_week
+    if start_date is not None:
+        data["start_date"] = start_date
+    if end_date is not None:
+        data["end_date"] = end_date
+    return await _client().post("/api/channels/recurring-rules/", data=data)
+
+
+@mcp.tool()
+async def update_recurring_rule(rule_id: int, fields: dict) -> dict:
+    """Partially update a recurring recording rule.
+
+    Pass any subset of rule fields as `fields`
+    (e.g. ``{"enabled": False}`` or ``{"end_time": "22:30:00"}``).
+    """
+    return await _client().patch(f"/api/channels/recurring-rules/{rule_id}/", data=fields)
+
+
+@mcp.tool()
+async def delete_recurring_rule(rule_id: int) -> dict:
+    """Delete a recurring recording rule by ID."""
+    return await _client().delete(f"/api/channels/recurring-rules/{rule_id}/")
+
+
+# ---------------------------------------------------------------------------
+# M3U FILTERS — fine-grained stream filtering per account
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def create_m3u_filter(
+    account_id: int,
+    regex_pattern: str,
+    filter_type: str = "group",
+    exclude: bool = False,
+    order: int | None = None,
+) -> dict:
+    """Create a stream filter for an M3U account.
+
+    `filter_type` is one of ``"group"`` (match by group title),
+    ``"name"`` (match by stream name), or ``"url"`` (match by stream URL).
+    `regex_pattern` is a regex applied to the chosen field.
+    If `exclude` is ``True``, matching streams are excluded; if ``False``
+    (default), only matching streams are included.
+    """
+    return await _client().post(
+        f"/api/m3u/accounts/{account_id}/filters/",
+        data=_clean(
+            {
+                "filter_type": filter_type,
+                "regex_pattern": regex_pattern,
+                "exclude": exclude,
+                "order": order,
+            }
+        ),
+    )
+
+
+@mcp.tool()
+async def update_m3u_filter(account_id: int, filter_id: int, fields: dict) -> dict:
+    """Partially update an M3U stream filter.
+
+    Pass any subset of filter fields as `fields`
+    (e.g. ``{"regex_pattern": "HD$", "exclude": True}``).
+    """
+    return await _client().patch(
+        f"/api/m3u/accounts/{account_id}/filters/{filter_id}/", data=fields
+    )
+
+
+@mcp.tool()
+async def delete_m3u_filter(account_id: int, filter_id: int) -> dict:
+    """Delete an M3U stream filter by account ID and filter ID."""
+    return await _client().delete(f"/api/m3u/accounts/{account_id}/filters/{filter_id}/")
+
+
+# ---------------------------------------------------------------------------
+# CHANNEL PROFILES — create / delete
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def create_channel_profile(name: str) -> dict:
+    """Create a new channel profile.
+
+    Channel profiles define different output sets for different client
+    types (e.g. a 4K profile, a mobile profile, etc.).
+    """
+    return await _client().post("/api/channels/profiles/", data={"name": name})
+
+
+@mcp.tool()
+async def delete_channel_profile(profile_id: int) -> dict:
+    """Delete a channel profile by ID."""
+    return await _client().delete(f"/api/channels/profiles/{profile_id}/")
 
 
 # ---------------------------------------------------------------------------

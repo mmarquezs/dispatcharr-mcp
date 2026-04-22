@@ -18,15 +18,17 @@ To generate an API key: Dispatcharr UI → **System → Users** → edit your us
 | Domain | Tools |
 |--------|-------|
 | **Channels** | `list_channels`, `get_channel`, `create_channel`, `update_channel`, `delete_channel`, `get_channel_streams` |
-| **Channel Groups** | `list_channel_groups`, `create_channel_group`, `delete_channel_group` |
+| **Channel Groups** | `list_channel_groups`, `create_channel_group`, `update_channel_group`, `delete_channel_group` |
 | **Streams** | `list_streams`, `get_stream`, `create_channel_from_stream` |
 | **Proxy / Live** | `get_proxy_status`, `get_channel_proxy_status`, `change_channel_stream`, `next_channel_stream`, `stop_channel_stream`, `stop_channel_client` |
-| **EPG** | `list_epg_sources`, `get_epg_source`, `create_epg_source`, `update_epg_source`, `delete_epg_source`, `list_epg_data`, `list_epg_programs` |
-| **M3U Accounts** | `list_m3u_accounts`, `get_m3u_account`, `create_m3u_account`, `update_m3u_account`, `delete_m3u_account`, `refresh_m3u_account`, `list_m3u_filters` |
-| **Channel Profiles** | `list_channel_profiles` |
+| **EPG** | `list_epg_sources`, `get_epg_source`, `create_epg_source`, `update_epg_source`, `delete_epg_source`, `list_epg_data`, `list_epg_programs`, `get_current_programs`, `get_epg_grid` |
+| **M3U Accounts** | `list_m3u_accounts`, `get_m3u_account`, `create_m3u_account`, `update_m3u_account`, `delete_m3u_account`, `refresh_m3u_account`, `list_m3u_filters`, `create_m3u_filter`, `update_m3u_filter`, `delete_m3u_filter` |
+| **Channel Profiles** | `list_channel_profiles`, `create_channel_profile`, `delete_channel_profile` |
 | **VOD** | `list_movies`, `get_movie`, `list_series`, `get_series`, `list_episodes`, `list_vod_categories` |
-| **System** | `get_core_settings`, `list_stream_profiles`, `get_system_events`, `list_integrations`, `list_stream_delivery_logs` |
-| **DVR** | `list_recordings`, `get_recording` |
+| **System** | `get_core_settings`, `get_version`, `list_stream_profiles`, `get_system_events`, `list_integrations`, `list_stream_delivery_logs` |
+| **DVR Recordings** | `list_recordings`, `get_recording`, `schedule_recording`, `delete_recording`, `stop_recording`, `extend_recording` |
+| **DVR Series Rules** | `list_series_rules`, `create_series_rule`, `delete_series_rule`, `evaluate_series_rules` |
+| **DVR Recurring Rules** | `list_recurring_rules`, `create_recurring_rule`, `update_recurring_rule`, `delete_recurring_rule` |
 | **HDHomeRun** | `list_hdhr_devices` |
 
 ## Requirements
