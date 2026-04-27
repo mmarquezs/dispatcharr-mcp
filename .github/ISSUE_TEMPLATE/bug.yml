@@ -1,0 +1,20 @@
+name: Bug Report
+description: Report a problem with an existing MCP tool
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this?
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior

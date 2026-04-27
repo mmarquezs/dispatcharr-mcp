@@ -1,0 +1,50 @@
+name: Feature Request
+description: Propose a new MCP tool or API group coverage
+labels: ["improvement"]
+body:
+  - type: dropdown
+    id: api-group
+    attributes:
+      label: API Group
+      description: Which Dispatcharr API group does this belong to?
+      options:
+        - Backups
+        - Channels (extended)
+        - Core (extended)
+        - Plugins
+        - Accounts/Users
+        - EPG (extended)
+        - M3U (extended)
+        - Connect (extended)
+        - VOD (extended)
+        - HDHR (extended)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: endpoints
+    attributes:
+      label: API Endpoints to Cover
+      description: List the Dispatcharr API endpoints this tool group should expose
+      placeholder: |
+        POST /api/backups/create/
+        GET /api/backups/
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: tools
+    attributes:
+      label: Proposed MCP Tools
+      description: List the MCP tool names and brief descriptions
+      placeholder: |
+        - `create_backup` — Trigger a new backup
+        - `list_backups` — List all backups
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional Notes
+      description: Any edge cases, auth requirements, or design decisions
