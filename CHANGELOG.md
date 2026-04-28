@@ -4,6 +4,15 @@ All notable changes to dispatcharr-mcp are documented here.
 
 ---
 
+## [0.3.1] - 2026-04-28
+
+### Fixed
+
+- `bulk_delete_channels` now sends `channel_ids` as JSON body instead of query params. The Dispatcharr API expects `{"channel_ids": [...]}` in the request body — query params were silently ignored, deleting nothing.
+- `DispatcharrClient.delete()` now accepts an optional `data` parameter for sending JSON body with DELETE requests.
+
+---
+
 ## [0.2.0] - 2026-04-22
 
 ### Added
