@@ -121,7 +121,7 @@ async def bulk_delete_channels(channel_ids: list[int]) -> dict:
     """
     return await _client().delete(
         "/api/channels/channels/bulk-delete/",
-        params={"ids": ",".join(str(i) for i in channel_ids)},
+        data={"channel_ids": channel_ids},
     )
 
 
