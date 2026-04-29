@@ -118,6 +118,8 @@ async def bulk_delete_channels(channel_ids: list[int]) -> dict:
 
     Pass a list of channel integer IDs. Use cases include removing
     duplicate channels identified via ``list_channels``.
+
+    Returns: ``{"message": "Channels deleted"}`` on success.
     """
     return await _client().delete(
         "/api/channels/channels/bulk-delete/",
@@ -162,6 +164,13 @@ async def bulk_rename_channels_regex(
     tokens like ``$1``, ``$&`` and ``$<name>`` are translated to Python.
 
     Example: find ``"HD$"`` replace ``""`` flags ``"i"`` to strip trailing "HD".
+
+    **Note on batch size**: This endpoint has a practical limit of ~200 IDs per
+    request due to HTTP POST body size constraints. For larger lists, split into
+    multiple batches.
+
+    **Dry-run**: Not supported by the API. Always preview carefully on test data
+    before running on production.
     """
     return await _client().post(
         "/api/channels/channels/edit/bulk-regex/",
@@ -304,9 +313,15 @@ async def get_channel_summary() -> dict:
 
 
 @mcp.tool()
-async def list_channel_ids() -> dict:
-    """List all channel IDs (lightweight endpoint for bulk operations)."""
-    return await _client().get("/api/channels/channels/ids/")
+async def list_channel_ids(search: str | None = None) -> dict:
+    """List all channel IDs (lightweight endpoint for bulk operations).
+
+    Optionally filter by name or channel group using the ``search`` parameter
+    (case-insensitive contains match).
+    """
+    return await _client().get(
+        "/api/channels/channels/ids/", params=_clean({"search": search})
+    )
 
 
 @mcp.tool()
