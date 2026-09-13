@@ -137,4 +137,4 @@ This project follows a **per-API-group** contribution pattern. Each Dispatcharr 
 
 - Python 3.10+ (use `X | None` not `Optional[X]`)
 - Lint with `ruff check dispatcharr_mcp/`
-- No external dependencies beyond `mcp[cli]` and `httpx`
+- No external dependencies beyond `fastmcp` and `httpx`
