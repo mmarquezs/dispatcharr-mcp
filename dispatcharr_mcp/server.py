@@ -12,7 +12,7 @@ Tools are grouped by domain:
   • System         — settings, stream profiles, system events
 """
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from dispatcharr_mcp.client import DispatcharrClient
 
