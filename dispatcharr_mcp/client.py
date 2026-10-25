@@ -106,7 +106,15 @@ class DispatcharrClient:
                     await self._login()
                 r = await c.request(method, self._url(path), headers=self._auth_headers(), **kwargs)
             r.raise_for_status()
-            return r.json() if r.content else {}
+            data = r.json() if r.content else {}
+            # FastMCP 4.x requires structured content to be a dict or None —
+            # a bare JSON array would fail validation ("structured_content must
+            # be a dict or None. Got list") and surface as a transport error
+            # with the payload trapped in the error text. Wrap list responses
+            # in a uniform envelope so every tool returns a dict.
+            if isinstance(data, list):
+                return {"items": data}
+            return data
 
     async def get(self, path: str, params: dict | None = None) -> Any:
         return await self._request("GET", path, params=params)

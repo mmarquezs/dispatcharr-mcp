@@ -10,6 +10,9 @@ Tools are grouped by domain:
   • VOD            — movies, series, episodes
   • Backups        — create, list, download, restore, schedule backups
   • System         — settings, stream profiles, system events
+
+Return shape: every tool returns a dict. Endpoints that answer with a bare
+JSON array are wrapped by the client as ``{"items": [...]}``.
 """
 
 from fastmcp import FastMCP
@@ -353,7 +356,7 @@ async def cleanup_channel_groups() -> dict:
 
 
 @mcp.tool()
-async def list_channel_groups() -> list:
+async def list_channel_groups() -> dict:
     """List all channel groups."""
     return await _client().get("/api/channels/groups/")
 
@@ -496,7 +499,7 @@ async def stop_channel_client(channel_id: str) -> dict:
 
 
 @mcp.tool()
-async def list_epg_sources() -> list:
+async def list_epg_sources() -> dict:
     """List all configured EPG (Electronic Programme Guide) sources."""
     return await _client().get("/api/epg/sources/")
 
@@ -574,7 +577,7 @@ async def list_epg_programs(
 
 
 @mcp.tool()
-async def list_m3u_accounts() -> list:
+async def list_m3u_accounts() -> dict:
     """List all configured M3U provider accounts."""
     return await _client().get("/api/m3u/accounts/")
 
@@ -642,7 +645,7 @@ async def refresh_m3u_account(account_id: int) -> dict:
 
 
 @mcp.tool()
-async def list_m3u_filters(account_id: int) -> list:
+async def list_m3u_filters(account_id: int) -> dict:
     """List stream filters configured for a specific M3U account."""
     return await _client().get(f"/api/m3u/accounts/{account_id}/filters/")
 
@@ -653,7 +656,7 @@ async def list_m3u_filters(account_id: int) -> list:
 
 
 @mcp.tool()
-async def list_channel_profiles() -> list:
+async def list_channel_profiles() -> dict:
     """List all channel profiles (output profiles used for different clients)."""
     return await _client().get("/api/channels/profiles/")
 
@@ -755,7 +758,7 @@ async def list_episodes(
 async def list_vod_categories(
     category_type: str | None = None,
     m3u_account: int | None = None,
-) -> list:
+) -> dict:
     """List VOD categories.
 
     Use `category_type` to filter: "movie" or "series".
@@ -772,13 +775,13 @@ async def list_vod_categories(
 
 
 @mcp.tool()
-async def get_core_settings() -> list:
+async def get_core_settings() -> dict:
     """Get Dispatcharr core settings (server configuration, defaults, etc.)."""
     return await _client().get("/api/core/settings/")
 
 
 @mcp.tool()
-async def list_stream_profiles() -> list:
+async def list_stream_profiles() -> dict:
     """List stream profiles (FFmpeg/Streamlink/VLC output configurations)."""
     return await _client().get("/api/core/streamprofiles/")
 
@@ -812,7 +815,7 @@ async def list_stream_delivery_logs(
 
 
 @mcp.tool()
-async def list_integrations() -> list:
+async def list_integrations() -> dict:
     """List all configured Connect integrations (webhooks, API callbacks, scripts)."""
     return await _client().get("/api/connect/integrations/")
 
@@ -833,7 +836,7 @@ async def update_channel_group(group_id: int, name: str) -> dict:
 
 
 @mcp.tool()
-async def get_current_programs(channel_uuids: list[str] | None = None) -> list:
+async def get_current_programs(channel_uuids: list[str] | None = None) -> dict:
     """Get the currently-playing programme for channels.
 
     Pass a list of channel UUIDs to filter to specific channels, or omit
@@ -847,7 +850,7 @@ async def get_current_programs(channel_uuids: list[str] | None = None) -> list:
 
 
 @mcp.tool()
-async def get_epg_grid() -> list:
+async def get_epg_grid() -> dict:
     """Get the full EPG grid — past hour, now, and next 24 hours.
 
     Returns programme data across all channels, suitable for building a
@@ -873,7 +876,7 @@ async def get_version() -> dict:
 
 
 @mcp.tool()
-async def list_recordings() -> list:
+async def list_recordings() -> dict:
     """List all DVR recordings."""
     return await _client().get("/api/channels/recordings/")
 
@@ -994,7 +997,7 @@ async def evaluate_series_rules(tvg_id: str | None = None) -> dict:
 
 
 @mcp.tool()
-async def list_recurring_rules() -> list:
+async def list_recurring_rules() -> dict:
     """List all recurring DVR recording rules."""
     return await _client().get("/api/channels/recurring-rules/")
 
@@ -1128,7 +1131,7 @@ async def delete_channel_profile(profile_id: int) -> dict:
 
 
 @mcp.tool()
-async def list_hdhr_devices() -> list:
+async def list_hdhr_devices() -> dict:
     """List all configured HDHomeRun virtual tuner devices."""
     return await _client().get("/api/hdhr/devices/")
 
@@ -1149,7 +1152,7 @@ async def create_backup() -> dict:
 
 
 @mcp.tool()
-async def list_backups() -> list:
+async def list_backups() -> dict:
     """List all available backups.
 
     Returns filename, size, creation date, and other metadata for each backup.
