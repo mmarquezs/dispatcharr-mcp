@@ -4,6 +4,15 @@ All notable changes to dispatcharr-mcp are documented here.
 
 ---
 
+## [0.5.1] - 2026-10-25
+
+### Fixed
+
+- All list-returning tools no longer fail with `structured_content must be a dict or None. Got list` (HTTP 500 through the 1mcp gateway). FastMCP 4.x requires structured content to be a dict or None, but the Dispatcharr API answers several endpoints with bare JSON arrays. `DispatcharrClient` now wraps bare-list responses in a uniform `{"items": [...]}` envelope, so every tool returns a dict and structured output is preserved. Affected every `list_*` tool plus tools whose `-> dict` annotation didn't match the endpoint shape (e.g. `get_channel_streams`).
+- Corrected the 15 tool return annotations from `-> list` to `-> dict` to match the guaranteed envelope shape.
+
+---
+
 ## [0.3.1] - 2026-04-28
 
 ### Fixed
